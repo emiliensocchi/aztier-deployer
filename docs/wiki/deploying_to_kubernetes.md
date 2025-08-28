@@ -14,36 +14,32 @@ This page summarizes the instructions to **deploy AzTier** to Azure Kubernetes S
 
 ## 🐳 2. Build the AzTier container images and push them to your registry
 
-
-Update config.json with the domain
-
-
 1. **Configure AzTier**  
 Make sure you have configured AzTier to your liking (see [project configuration](https://github.com/emiliensocchi/aztier-deployer/wiki/project_configuration)).
 
 
-2. **Edit [`config.json`](https://github.com/emiliensocchi/aztier-deployer/app/frontend/config.json):**  
+2. **Edit [`config.json`](https://github.com/emiliensocchi/aztier-deployer/blob/main/app/frontend/config.json):**  
     Update `http://localhost` with domain name you wish to use for AzTier (e.g. `https://aztier.mydomain.com`).  
     **Note**: the domain will have to be configured separatly to point to the external IP address of your cluster's Ingress.
 
 
 3. **Build the AzTier container images**  
     Build the frontend and backend components of AzTier into container images, using the provided Dockerfiles. From the root directory of this repository follow these steps:  
-    Frontend:
+    **Frontend:**
     ```sh
     docker build -t <your-acr-name>.azurecr.io/aztier-frontend:latest ./app/frontend/
     ```
-    Backend:
+    **Backend:**
     ```sh
     docker build -t <your-acr-name>.azurecr.io/aztier-backend:latest ./app/backend/
     ```
 
 4. **Push the images to your Azure Container Registry (ACR)**:  
-    Frontend:
+    **Frontend:**
     ```sh
     docker push <your-acr-name>.azurecr.io/aztier-frontend:latest
     ```
-    Backend: 
+    **Backend:**
     ```sh
     docker push <your-acr-name>.azurecr.io/aztier-backend:latest
     ```
@@ -69,15 +65,15 @@ Follow these steps:
 
     The Federated Credential should be configured as follows:
     ```yaml
-    Cluster Issuer URL: <retrieve-with-az-cli>
+    Cluster Issuer URL: <retrieve-with-az-cli-below>
     Namespace: aztier
-    Service Account: aztier-backend-sa
-    Subject identifier: system:serviceaccount:aztier:aztier-backend-sa
+    Service Account: aztier-backend-workload-identity
+    Subject identifier: system:serviceaccount:aztier:aztier-backend-workload-identity
     Name: aztier-backend-federation
     Audience: api://AzureADTokenExchange
     ```
 
-    Using Azure CLI, show the "Cluster Issuer URL" of your AKS cluster as follows ([more info](https://learn.microsoft.com/en-us/azure/aks/use-oidc-issuer#show-the-oidc-issuer-url)):
+    Using Azure CLI, the "Cluster Issuer URL" of your AKS cluster can be retrieved as follows ([more info](https://learn.microsoft.com/en-us/azure/aks/use-oidc-issuer#show-the-oidc-issuer-url)):
     ```sh
     az aks show --name myAKScluster --resource-group myResourceGroup --query "oidcIssuerProfile.issuerUrl" -o tsv
     ```
@@ -91,7 +87,7 @@ Follow these steps:
 
 Before deploying, customize the Kubernetes manifest files with your environment details:
 
-1. **Edit [`configmap.yaml`](https://github.com/emiliensocchi/aztier-deployer/app/k8s/configmap.yaml):**  
+1. **Edit [`configmap.yaml`](https://github.com/emiliensocchi/aztier-deployer/blob/main/app/k8s/configmap.yaml):**  
     Update the `data` section with your Azure and GitHub settings:
     ```yaml
     AZURE_TENANT_ID: <your-tenant-id>
@@ -102,14 +98,14 @@ Before deploying, customize the Kubernetes manifest files with your environment 
     GITHUB_REPOSITORY: <name-of-your-duplicated-repository>
     ```
 
-2. **Edit [`serviceaccount.yaml`](https://github.com/emiliensocchi/aztier-deployer/app/k8s/serviceaccount.yaml):**
+2. **Edit [`serviceaccount.yaml`](https://github.com/emiliensocchi/aztier-deployer/blob/main/app/k8s/serviceaccount.yaml):**
     Update the `azure.workload.identity/client-id` section with the Client Id of your Managed Identity. 
 
-3. **Edit [`ingress.yaml`](https://github.com/emiliensocchi/aztier-deployer/app/k8s/ingress.yaml):**  
+3. **Edit [`ingress.yaml`](https://github.com/emiliensocchi/aztier-deployer/blob/main/app/k8s/ingress.yaml):**  
     Update the `host` section with the domain name you wish to use for AzTier.  
     **Note**: the domain will have to be configured separatly to point to the external IP address of your cluster's Ingress.
 
-4. **Edit [`deployment.yaml`](https://github.com/emiliensocchi/aztier-deployer/app/k8s/deployment.yaml):**  
+4. **Edit [`deployment.yaml`](https://github.com/emiliensocchi/aztier-deployer/blob/main/app/k8s/deployment.yaml):**  
     - Update the `image` sections with the image names pushed to your ACR in [step 2](#-2-build-the-aztier-container-images-and-push-them-to-your-registry).
 
 

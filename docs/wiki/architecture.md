@@ -29,13 +29,13 @@ AzTier uses a layered architecture with the following components:
 
 ## ☸️ Containerized architecture
 
-AzTier can be deployed in Azure Kubernetes Service (AKS) using the provided manifest and Dockerfiles located in the [`app`](https://github.com/emiliensocchi/aztier-deployer/app/) folder of this repository. 
+AzTier can be deployed in Azure Kubernetes Service (AKS) using the provided manifest and Dockerfiles located in the [`app`](https://github.com/emiliensocchi/aztier-deployer/tree/main/app) folder of this repository. 
 
 The containerized architecture can be visualized as follows:
 
 ```mermaid
 flowchart TD
-    subgraph ContainerRegistry["Container Registry"]
+    subgraph ContainerRegistry["Azure Container Registry (ACR)"]
         subgraph registry_repo_box["Repositories"]
             registry_frontend["aztier-frontend"]
             registry_backend["aztier-backend"]

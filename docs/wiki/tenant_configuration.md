@@ -17,9 +17,9 @@ In your Entra tenant, [register a new application](https://learn.microsoft.com/e
 
 ### Step 2: Configure GitHub Repository Variables
 
-In your [cloned GitHub repository](https://github.com/emiliensocchi/aztier-deployer/wiki/github_configuration), add the following repository variables:
+In your [duplicated GitHub repository](https://github.com/emiliensocchi/aztier-deployer/wiki/github_configuration), add the following repository variables:
 
-| Name               | Value                      |
+| Name               | Value                     |
 |--------------------|---------------------------|
 | `AZURE_TENANT_ID`  | `<your-tenant-id>`        |
 | `AZURE_CLIENT_ID`  | `<your-client-id>`        |

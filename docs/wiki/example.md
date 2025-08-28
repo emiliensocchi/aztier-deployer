@@ -4,7 +4,7 @@ This directory contains static example files to demonstrate the use of AzTier.
 
 ## 👀 Preview 
 
-![AzTier Example Screenshot](https://raw.githubusercontent.com/emiliensocchi/aztier-deployer/blob/main/example/images/example.png)
+![AzTier Example Screenshot](./images/03_example.png)
 
 
 ## 🐳 Deploy AzTier locally in a container

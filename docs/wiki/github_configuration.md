@@ -41,12 +41,12 @@ To replicate this public repository into your internal repository:
 
     ```yaml
     Repository access: Only select repositories
-    Repositories: <your cloned repository>
+    Repositories: <your duplicated repository>
     Permissions:
         Repository permissions:
         Contents: Read-only
         Metadata: Read-only
     ```
-    **Note:** no organization-level permissions are required.
+    **Note:** no organization-level permission is required.
 
 2. After generating the PAT, **copy and save it securely**. You will need it in the [Deploying to Kubernetes](https://github.com/emiliensocchi/aztier-deployer/wiki/deploying_to_kubernetes) step.

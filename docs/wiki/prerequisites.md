@@ -16,4 +16,4 @@ An **Entra user** with the following permissions is required:
 
 ### 🚀 GitHub
 
-A GitHub user with the ability to create a [fine-grained Personal Access Token (PAT)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token) for the repository you are about to clone.
+A GitHub user with the ability to create a [fine-grained Personal Access Token (PAT)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token) for the repository you are about to duplicate.
