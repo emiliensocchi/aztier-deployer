@@ -1,0 +1,87 @@
+[
+    {
+        "tier": "0",
+        "id": "b24988ac-6180-42a0-ab88-20f7382dd24c",
+        "assetName": "Contributor",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Grants full access to manage all resources, but does not allow you to assign roles in Azure RBAC, manage assignments in Azure Blueprints, or share image galleries.",
+        "documentationUri": "https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#contributor",
+        "shortestPath": "Can run commands on compute resources within reach that are assigned Managed Identities with permissions to other scopes, and escalate privileges.",
+        "example": "TA is Contributor on a subscription containing Logic Apps and Automation Accounts. The Automation Accounts are assigned Managed Identities (MIs) with Contributor access to other subscriptions, while the Logic Apps have MIs with MS Graph application permissions. TA can leverage the Automation Accounts and Logic Apps to impersonate the MIs and escalate privileges within Azure and MS Graph.  Note: many paths of this kind are possible with other types of compute resources."
+    },
+    {
+        "tier": "0",
+        "id": "ef7e0a31-65f6-4681-b4ed-eafe2b0c8671",
+        "assetName": "Awesome custom role for Tier 0",
+        "assetType": "Custom",
+        "assignableScope": "/",
+        "assetDefinition": "Awesome custom role definition.",
+        "documentationUri": "",
+        "shortestPath": "Same as Contributor.",
+        "example": "Same as Contributor."
+    },
+    {
+        "tier": "1",
+        "id": "f25e0fa2-a7c8-4377-a976-54943a77a395",
+        "assetName": "Key Vault Contributor",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Lets you manage key vaults, but not access to them.",
+        "documentationUri": "https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#key-vault-contributor",
+        "shortestPath": "Can steal all objects types in the Key Vaults within reach (e.g. secrets, certificates, Storage Account keys, etc.) to move laterally to other resources.",
+        "example": "TA is Key Vault Contributor on a subscription with multiple Key Vaults. TA can leverage all objects stored in each Key Vault (e.g. access keys, connection strings, client secrets, etc.) to move laterally to the affected resources."
+    },
+    {
+        "tier": "1",
+        "id": "a6749d00-02f6-4329-a17c-696aec244fef",
+        "assetName": "Awesome custom role for Tier 1",
+        "assetType": "Custom",
+        "assignableScope": "/providers/Microsoft.Management/managementGroups/fcbbd2d7-1f93-4d8d-ad9a-494791b34801",
+        "assetDefinition": "Awesome custom role definition.",
+        "documentationUri": "",
+        "shortestPath": "Same as Key Vault Contributor.",
+        "example": "Same as Key Vault Contributor."
+    },
+    {
+        "tier": "2",
+        "id": "9b7fa17d-e63e-47b0-bb0a-15c516ac86ec",
+        "assetName": "SQL DB Contributor",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Lets you manage SQL databases, but not access to them. Also, you can't manage their security-related policies or their parent SQL servers.",
+        "documentationUri": "https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#sql-db-contributor",
+        "worstCaseScenario": "Can access the content of all SQL databases within reach that are network accessible, and where some of them may contain sensitive data."
+    },
+    {
+        "tier": "2",
+        "id": "82ac97f9-0c31-4f28-9610-ba84ed66f42c",
+        "assetName": "Awesome custom role for Tier 2",
+        "assetType": "Custom",
+        "assignableScope": "/subscriptions/6209c72d-1490-4a1c-88c7-c333940bfcf6/resourceGroups/my-awesome-rg, /subscriptions/6209c72d-1490-4a1c-88c7-c333940bfcf6/resourceGroups/my-not-so-awesome-rg",
+        "assetDefinition": "Awesome custom role definition.",
+        "documentationUri": "",
+        "shortestPath": "Same as SQL DB Contributor.",
+        "example": "Same as SQL DB Contributor."
+    },
+    {
+        "tier": "3",
+        "id": "5d58bcaf-24a5-4b20-bdb6-eed9f69fbe4c",
+        "assetName": "Management Group Contributor",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Management Group Contributor Role",
+        "documentationUri": "https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#management-group-contributor",
+        "worstCaseScenario": "Can delete Management Groups to automatically move child subscriptions to the Tenant Root Group, and create service disruption for certain types of automated jobs."
+    },
+    {
+        "tier": "3",
+        "id": "1c3e3d8a-f246-4a52-a194-3a625e954037",
+        "assetName": "Awesome custom role for Tier 3",
+        "assetType": "Custom",
+        "assignableScope": "/",
+        "assetDefinition": "Awesome custom role definition.",
+        "documentationUri": "",
+        "worstCaseScenario": "-"
+    }
+]

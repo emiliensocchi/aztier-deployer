@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AzTier: Azure Administrative Tiering</title>
+  <link rel="icon" type="image/png" href="images/favicon.png">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <section class="section">
+    <div class="container" style="position:relative;">
+  <button id="disclaimer-btn" class="disclaimer-btn-custom disclaimer-btn-canvas-topright" aria-label="Config">Config</button>
+      <!-- Thumbnail -->
+      <img src="images/aztier.png" alt="AzTier logo: Azure Administrative Tiering" width="120" height="120" style="position:absolute; left:-9999px; width:120px; height:auto;" loading="eager" />
+      <h1 class="title has-text-primary" id="main-title">🌩️ Azure Administrative Tiering (AzTier)</h1>
+      <h2 class="subtitle">Browse Azure administrative assets categorized based on known attack paths.</h2>
+      <!-- Triple toggle switch -->
+      <div class="tabs is-toggle is-fullwidth is-large" id="main-tabs">
+        <!-- Toggle switch will be injected here by JS -->
+      </div>
+      <!-- Tier filter buttons -->
+      <div id="tier-filter-bar" style="display:flex; align-items:center; justify-content:flex-start; margin-bottom:1.2em;">
+        <!-- Tier buttons will be injected here by JS -->
+      </div>
+      <div id="content-area">
+        <!-- Dynamic content will be injected here -->
+      </div>
+    </div>
+  </section>
+  <footer class="footer has-text-centered">
+    <div class="content">
+      <p>Project by <a href="https://github.com/emiliensocchi">Emilien Socchi</a></p>
+    </div>
+  </footer>
+  <!-- Modal structure for JSON data -->
+  <div id="json-popup" class="modal">
+    <div class="modal-background"></div>
+    <div class="modal-content">
+      <div class="box">
+        <button class="delete" id="close-popup" aria-label="close"></button>
+        <h3 id="json-popup-title" class="title is-4">Details</h3>
+        <div id="json-content" style="max-height: 60vh; overflow-y: auto;"></div>
+      </div>
+    </div>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>

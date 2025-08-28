@@ -1,0 +1,12 @@
+[
+    {
+        "detectedOn": "2025-06-22",
+        "apiEvent": "added",
+        "id": "a22dd4a7-c977-4e59-97b4-d4372974efdc",
+        "assetName": "Role Assignment Reader",
+        "assetType": "Custom",
+        "assignableScope": "/providers/Microsoft.Management/managementGroups/fcbbd2d7-1f93-4d8d-ad9a-494791b34801",
+        "assetDefinition": "Gives permissions to review Role Assignments & Definitions",
+        "documentationUri": ""
+    }
+]

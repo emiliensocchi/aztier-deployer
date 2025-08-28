@@ -1,0 +1,62 @@
+[
+    {
+        "tier": "0",
+        "id": "9e3f62cf-ca93-4989-b6ce-bf83c28f9fe8",
+        "assetName": "RoleManagement.ReadWrite.Directory",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Allows the app to read and manage the role-based access control (RBAC) settings for your company's directory, without a signed-in user. This includes instantiating directory roles and managing directory role membership, and reading directory role templates, directory roles and memberships.",
+        "documentationUri": "https://learn.microsoft.com/en-us/graph/permissions-reference#rolemanagementreadwritedirectory",
+        "pathType": "Direct",
+        "shortestPath": "Can assign the Global Admin role to a controlled principal.",
+        "example": "TA assigns the Global Admin role to the compromised SP, re-authenticates with the SP and escalates to Global Admin."
+    },
+    {
+        "tier": "0",
+        "id": "50483e42-d915-4231-9639-7fdb7fd190e5",
+        "assetName": "UserAuthenticationMethod.ReadWrite.All",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Allows the application to read and write authentication methods of all users in your organization, without a signed-in user.                       Authentication methods include things like a user\u2019s phone numbers and Authenticator app settings. This                      does not allow the app to see secret information like passwords, or to sign-in or otherwise use the authentication methods",
+        "documentationUri": "https://learn.microsoft.com/en-us/graph/permissions-reference#userauthenticationmethodreadwriteall",
+        "pathType": "Direct",
+        "shortestPath": "Can generate a Temporary Access Pass (TAP) and take over any user account in the tenant.  Note: if TAP is not an enabled authentication method in the tenant, this path needs to be combined with Policy.ReadWrite.AuthenticationMethod to be successful.",
+        "example": "TA creates a TAP for a break-glass account, authenticates with the TAP instead of the account's password and escalates to Global Admin."
+    },
+    {
+        "tier": "1",
+        "id": "1dfe531a-24a6-4f1b-80f4-7a0dc5a0a171",
+        "assetName": "APIConnectors.ReadWrite.All",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Allows the app to read, create and manage the API connectors used in user authentication flows, without a signed-in user.",
+        "documentationUri": "https://learn.microsoft.com/en-us/graph/permissions-reference#apiconnectorsreadwriteall"
+    },
+    {
+        "tier": "1",
+        "id": "ef5f7d5c-338f-44b0-86c3-351f46c8bb5f",
+        "assetName": "AccessReview.ReadWrite.All",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Allows the app to read, update, delete and perform actions on access reviews, reviewers, decisions and settings in the organization, without a signed-in user.",
+        "documentationUri": "https://learn.microsoft.com/en-us/graph/permissions-reference#accessreviewreadwriteall"
+    },
+    {
+        "tier": "2",
+        "id": "ae73097b-cb2a-4447-b064-5d80f6093921",
+        "assetName": "DirectoryRecommendations.Read.All",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Allows the app to read all Azure AD recommendations, without a signed-in user.",
+        "documentationUri": "https://learn.microsoft.com/en-us/graph/permissions-reference#directoryrecommendationsreadall"
+    },
+    {
+        "tier": "2",
+        "id": "dbb9058a-0e50-45d7-ae91-66909b5d4664",
+        "assetName": "Domain.Read.All",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Allows the app to read all domain properties without a signed-in user.",
+        "documentationUri": "https://learn.microsoft.com/en-us/graph/permissions-reference#domainreadall"
+    }
+]

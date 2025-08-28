@@ -1,0 +1,12 @@
+[
+    {
+        "detectedOn": "2025-06-01",
+        "apiEvent": "added",
+        "id": "bb7f9876-a5e0-42e1-bf85-ce58e5c4d832",
+        "assetName": "Application Remover",
+        "assetType": "Custom",
+        "assignableScope": "/",
+        "assetDefinition": "Can delete App Registrations.",
+        "documentationUri": ""
+    }
+]

@@ -1,0 +1,15 @@
+{
+  "company_name": "Awesome Corp",
+  "project_configuration_uri": "./dummy_files/config.json",
+  "tier_definitions": "./dummy_files/tier_definitions.json",
+  "tiered_asset_uris": {
+    "azure": "./dummy_files/tiered-azure-roles.json",
+    "entra": "./dummy_files/tiered-entra-roles.json",
+    "msgraph": "./dummy_files/tiered-msgraph-app-permissions.json"
+  },
+  "untiered_asset_uris": {
+    "azure": "./dummy_files/untiered-azure-roles.json",
+    "entra": "./dummy_files/untiered-entra-roles.json",
+    "msgraph": "./dummy_files/untiered-msgraph-app-permissions.json"
+  }
+}

@@ -1,0 +1,64 @@
+[
+    {
+        "tier": "0",
+        "id": "9b895d92-2cd3-44c7-9d02-a6ac2d5ea5c3",
+        "assetName": "Application Administrator",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Can create and manage all aspects of app registrations and enterprise apps.",
+        "documentationUri": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/permissions-reference#application-administrator",
+        "pathType": "Indirect",
+        "shortestPath": "Can impersonate any SP with privileged application permissions granted for Microsoft Graph, which can be abused to become Global Admin.",
+        "example": "TA identifies an SP with the RoleManagement.ReadWrite.Directory application permission. TA creates a new secret for the SP, impersonates it and abuses the granted permissions to escalate to Global Admin."
+    },
+    {
+        "tier": "0",
+        "id": "93331048-c785-42fb-bc84-ca396bf7523a",
+        "assetName": "Awesome custom role for Tier 0",
+        "assetType": "Custom",
+        "assignableScope": "/",
+        "assetDefinition": "Awesome custom role definition.",
+        "documentationUri": "",
+        "pathType": "Indirect",
+        "shortestPath": "Can become member of a non-role-assignable group with assigned privileged Azure permissions, and leverage Azure resources to escalate to Global Admin. Note: can also acquire access to external solutions integrated with Entra ID via SSO, and providing access based on non-role-assignable group memberships.",
+        "example": "TA adds the compromised user account to a group with Contributor access to a subscription containing a resource with an assigned MI. The MI has privileged application permissions granted for Microsoft Graph, and the same path as Application Administrator can be followed. Note: many other paths of this kind are possible."
+    },
+    {
+        "tier": "1",
+        "id": "44367163-eba1-44c3-98af-f5787879f96a",
+        "assetName": "Dynamics 365 Administrator",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Can manage all aspects of the Dynamics 365 product.",
+        "documentationUri": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/permissions-reference#dynamics-365-administrator",
+        "providesFullAccessTo": "Dynamics 365."
+    },
+    {
+        "tier": "1",
+        "id": "b21dd4a7-c977-4e59-97b4-d4372974efdc",
+        "assetName": "Awesome custom role for Tier 1",
+        "assetType": "Custom",
+        "assignableScope": "/",
+        "assetDefinition": "Awesome custom role definition.",
+        "documentationUri": "",
+        "providesFullAccessTo": "Microsoft InTune."
+    },
+    {
+        "tier": "2",
+        "id": "88d8e3e3-8f55-4a1e-953a-9b9898b8876b",
+        "assetName": "Directory Readers",
+        "assetType": "Built-in",
+        "assignableScope": "/",
+        "assetDefinition": "Can read basic directory information. Commonly used to grant directory read access to applications and guests.",
+        "documentationUri": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/permissions-reference#directory-readers"
+    },
+    {
+        "tier": "2",
+        "id": "709f8b75-44bf-4636-b59f-e653c5e8235f",
+        "assetName": "Awesome custom role for Tier 2",
+        "assetType": "Custom",
+        "assignableScope": "/",
+        "assetDefinition": "Awesome custom role definition.",
+        "documentationUri": ""
+    }
+]
