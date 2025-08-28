@@ -1,0 +1,15 @@
+{
+  "company_name": "",
+  "project_configuration_uri": "http://localhost/api/project-config",
+  "tier_definitions": "http://localhost/api/tier-definitions",
+  "tiered_asset_uris": {
+    "azure": "http://localhost/api/azure/tiered-roles",
+    "entra": "http://localhost/api/entra/tiered-roles",
+    "msgraph": "http://localhost/api/msgraph/tiered-permissions"
+  },
+  "untiered_asset_uris": {
+    "azure": "http://localhost/api/azure/untiered-roles",
+    "entra": "http://localhost/api/entra/untiered-roles",
+    "msgraph": "http://localhost/api/msgraph/untiered-permissions"
+  }
+}

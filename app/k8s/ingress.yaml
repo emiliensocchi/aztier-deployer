@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aztier-frontend-ingress
+  namespace: aztier
+  annotations:
+    spec.ingressClassName: nginx
+spec:
+  rules:
+  - host: aztier.mydomain.com   # Replace with your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: aztier-frontend
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aztier-backend-ingress
+  namespace: aztier
+  annotations:
+    spec.ingressClassName: nginx
+spec:
+  rules:
+  - host: aztier.mydomain.com   # Replace with your domain
+    http:
+      paths:
+      - path: /api/
+        pathType: Prefix
+        backend:
+          service:
+            name: aztier-backend
+            port:
+              number: 5000

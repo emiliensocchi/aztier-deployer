@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aztier-config
+  namespace: aztier
+data:
+  AZURE_TENANT_ID: <your-tenant-id>
+  AZURE_CLIENT_ID: <your-managed-identity-client-id>
+  AZURE_FEDERATED_TOKEN_FILE: /var/run/secrets/azure/tokens/azure-identity-token  # Should remain unchanged
+  AZURE_KEY_VAULT_URL: <your-keyvault-secret-identifier>
+  GITHUB_ORGANIZATION: <name-of-your-github-organization>
+  GITHUB_REPOSITORY: <name-of-your-duplicated-repository>   # By default: "aztier-deployer"

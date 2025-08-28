@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aztier-app
+  namespace: aztier
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aztier-app
+  template:
+    metadata:
+      labels:
+        app: aztier-app
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: aztier-backend-workload-identity
+      containers:
+      - name: aztier-frontend
+        image: <your-acr-name>.azurecr.io/aztier-frontend:latest  # Replace with your ACR name
+        ports:
+        - containerPort: 8080
+        imagePullPolicy: Always
+      - name: aztier-backend
+        image: <your-acr-name>.azurecr.io/aztier-backend:latest   # Replace with your ACR name
+        ports:
+        - containerPort: 5000
+        envFrom:
+          - configMapRef:
+              name: aztier-config
+        imagePullPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aztier-frontend
+  namespace: aztier
+spec:
+  selector:
+    app: aztier-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aztier-backend
+  namespace: aztier
+spec:
+  selector:
+    app: aztier-app
+  ports:
+  - protocol: TCP
+    port: 5000
+    targetPort: 5000
+  type: ClusterIP
