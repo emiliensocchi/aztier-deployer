@@ -1,6 +1,10 @@
-# 💡 Example 
+# 🎬 Demo
 
 This directory contains static example files to demonstrate the use of AzTier.
+
+## 👀 Preview 
+
+![AzTier Example Screenshot](./images/example.png)
 
 
 ## 🐳 Deploy AzTier locally in a container
