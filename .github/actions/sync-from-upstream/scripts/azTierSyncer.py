@@ -850,6 +850,7 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
     if role_type == 'azure':
         # Added Azure roles
         added_tiered_azure_roles = find_added_assets(tiered_builtin_roles_from_aat, tiered_builtin_roles_from_local)
+        all_azure_role_ids_in_use = []
 
         if include_only_roles_in_use:
             # Check if added roles are in use
@@ -900,13 +901,17 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
             removed_azure_role_id = removed_azure_role['id']
             tiered_all_roles_from_local = [role for role in tiered_all_roles_from_local if role['id'] != removed_azure_role_id]
 
+        if include_only_roles_in_use:
+            # Check if tiered roles are still in use
+            tiered_all_roles_from_local = [role for role in tiered_all_roles_from_local if (role['id'] in all_azure_role_ids_in_use or role['assetType'] == 'Custom')]
+
     elif role_type == 'entra':
         # Added Entra roles
         added_tiered_entra_roles = find_added_assets(tiered_builtin_roles_from_aat, tiered_builtin_roles_from_local)
+        all_entra_role_ids_in_use = []
 
         if include_only_roles_in_use:
             # Check if added roles are in use
-            built_in_entra_role_definitions_in_use = []
             is_pim_enabled = is_pim_enabled_for_graph(token)
 
             if is_pim_enabled:
@@ -950,6 +955,10 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
         for removed_role in removed_tiered_built_in_entra_role:
             removed_role_id = removed_role['id']
             tiered_all_entra_roles_from_local = [role for role in tiered_all_entra_roles_from_local if role['id'] != removed_role_id]
+
+        if include_only_roles_in_use:
+            # Check if tiered roles are still in use
+            tiered_all_roles_from_local = [role for role in tiered_all_roles_from_local if (role['id'] in all_entra_role_ids_in_use or role['assetType'] == 'Custom')]
 
     elif role_type == 'graph':
         # Added MS Graph application permissions
