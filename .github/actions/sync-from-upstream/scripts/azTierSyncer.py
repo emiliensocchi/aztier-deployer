@@ -1071,11 +1071,14 @@ if __name__ == "__main__":
         update_tiered_assets(azure_roles_tier_file, tiered_all_azure_roles_from_local)
 
         if has_aat_been_updated:
-            print ('Built-in Azure roles: changes have been detected and merged from public AzTier')
+            if len(updated_tiered_all_azure_roles_from_local) < len(tiered_all_azure_roles_from_local):
+                print ('Built-in Azure roles: no change detected in public AzTier, but upstream roles are not used locally anymore and have been removed from tiered assets')
+            else:
+                print ('Built-in Azure roles: changes have been detected and merged from public AzTier')
         else:
-            print ("Built-in Azure roles: no changes detected in public AzTier, but local changes have been overridden with upstream data ('keepLocalChanges' is set to 'false')")
+            print ("Built-in Azure roles: no change detected in public AzTier, but local changes have been overridden with upstream data ('keepLocalChanges' is set to 'false')")
     else:
-        print ('Built-in Azure roles: no changes')
+        print ('Built-in Azure roles: no change')
 
 
     # Update locally-tiered Entra roles with the latest upstream version
@@ -1091,11 +1094,15 @@ if __name__ == "__main__":
         update_tiered_assets(entra_roles_tier_file, tiered_all_entra_roles_from_local)
 
         if has_aat_been_updated:
-            print ('Built-in Entra roles: changes have been detected and merged from public AzTier')
+            if len(updated_tiered_all_entra_roles_from_local) < len(tiered_all_entra_roles_from_local):
+                print ('Built-in Entra roles: no change detected in public AzTier, but upstream roles are not used locally anymore and have been removed from tiered assets')
+            else:
+                print ('Built-in Entra roles: changes have been detected and merged from public AzTier')
+
         else:
-            print ("Built-in Entra roles: no changes detected in public AzTier, but local changes have been overridden with upstream data ('keepLocalChanges' is set to 'false')")
+            print ("Built-in Entra roles: no change detected in public AzTier, but local changes have been overridden with upstream data ('keepLocalChanges' is set to 'false')")
     else:
-        print ('Built-in Entra roles: no changes')
+        print ('Built-in Entra roles: no change')
 
 
     # Update locally-tiered MS Graph application permissions with the latest upstream version
@@ -1113,6 +1120,6 @@ if __name__ == "__main__":
         if has_aat_been_updated:
             print ('Built-in MS Graph app permissions: changes have been detected and merged from public AzTier')
         else:
-            print ("Built-in MS Graph app permissions: no changes detected in public AzTier, but local changes have been overridden with upstream data ('keepLocalChanges' is set to 'false')")
+            print ("Built-in MS Graph app permissions: no change detected in public AzTier, but local changes have been overridden with upstream data ('keepLocalChanges' is set to 'false')")
     else:
-        print ('Built-in MS Graph app permissions: no changes')
+        print ('Built-in MS Graph app permissions: no change')
