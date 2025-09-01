@@ -963,6 +963,7 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
     elif role_type == 'graph':
         # Added MS Graph application permissions
         added_tiered_msgraph_permissions = find_added_assets(tiered_builtin_roles_from_aat, tiered_builtin_roles_from_local)
+        all_assigned_msgraph_app_permission_ids = []
 
         if include_only_roles_in_use:
             # Check if added permissions are in use
@@ -997,6 +998,10 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
         for removed_role in removed_tiered_built_in_msgraph_permission:
             removed_role_id = removed_role['id']
             tiered_all_msgraph_permissions_from_local = [role for role in tiered_all_msgraph_permissions_from_local if role['id'] != removed_role_id]
+
+        if include_only_roles_in_use:
+            # Check if tiered permissions are still in use
+            tiered_all_roles_from_local = [role for role in tiered_all_msgraph_permissions_from_local if (role['id'] in all_assigned_msgraph_app_permission_ids or role['assetType'] == 'Custom')]
     else:
         print ('FATAL ERROR - Improper use of function: the value of the role_type parameter is invalid. Accepted values are: azure, entra, graph')
         exit()
@@ -1098,7 +1103,6 @@ if __name__ == "__main__":
                 print ('Built-in Entra roles: no change detected in public AzTier, but upstream roles are not used locally anymore and have been removed from tiered assets')
             else:
                 print ('Built-in Entra roles: changes have been detected and merged from public AzTier')
-
         else:
             print ("Built-in Entra roles: no change detected in public AzTier, but local changes have been overridden with upstream data ('keepLocalChanges' is set to 'false')")
     else:
@@ -1118,7 +1122,10 @@ if __name__ == "__main__":
         update_tiered_assets(msgraph_app_permissions_tier_file, tiered_all_msgraph_app_permissions_from_local)
 
         if has_aat_been_updated:
-            print ('Built-in MS Graph app permissions: changes have been detected and merged from public AzTier')
+            if len(updated_tiered_all_msgraph_app_permissions_from_local) < len(tiered_all_msgraph_app_permissions_from_local):
+                print ('Built-in MS Graph app permissions: no change detected in public AzTier, but upstream permissions are not used locally anymore and have been removed from tiered assets')
+            else:
+                print ('Built-in MS Graph app permissions: changes have been detected and merged from public AzTier')
         else:
             print ("Built-in MS Graph app permissions: no change detected in public AzTier, but local changes have been overridden with upstream data ('keepLocalChanges' is set to 'false')")
     else:
