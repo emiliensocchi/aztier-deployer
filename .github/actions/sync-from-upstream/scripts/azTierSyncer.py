@@ -1097,7 +1097,7 @@ if __name__ == "__main__":
         has_aat_been_updated = False if (len(updated_tiered_all_entra_roles_from_local) == len(tiered_all_entra_roles_from_local)) else True
         tiered_all_entra_roles_from_local = sorted(updated_tiered_all_entra_roles_from_local, key=lambda x: (x['tier'], x['assetName']))
         update_tiered_assets(entra_roles_tier_file, tiered_all_entra_roles_from_local)
-<
+
         if has_aat_been_updated:
             if len(updated_tiered_all_entra_roles_from_local) < len(tiered_all_entra_roles_from_local):
                 print ('Built-in Entra roles: no change detected in public AzTier, but upstream roles are not used locally anymore and have been removed from tiered assets')
