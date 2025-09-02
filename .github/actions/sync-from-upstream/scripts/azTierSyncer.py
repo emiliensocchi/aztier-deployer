@@ -997,11 +997,11 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
 
         for removed_role in removed_tiered_built_in_msgraph_permission:
             removed_role_id = removed_role['id']
-            tiered_all_msgraph_permissions_from_local = [role for role in tiered_all_msgraph_permissions_from_local if role['id'] != removed_role_id]
+            tiered_all_roles_from_local = [role for role in tiered_all_roles_from_local if role['id'] != removed_role_id]
 
         if include_only_roles_in_use:
             # Check if tiered permissions are still in use
-            tiered_all_roles_from_local = [role for role in tiered_all_msgraph_permissions_from_local if (role['id'] in all_assigned_msgraph_app_permission_ids or role['assetType'] == 'Custom')]
+            tiered_all_roles_from_local = [role for role in tiered_all_roles_from_local if (role['id'] in all_assigned_msgraph_app_permission_ids or role['assetType'] == 'Custom')]
     else:
         print ('FATAL ERROR - Improper use of function: the value of the role_type parameter is invalid. Accepted values are: azure, entra, graph')
         exit()
@@ -1097,7 +1097,7 @@ if __name__ == "__main__":
         has_aat_been_updated = False if (len(updated_tiered_all_entra_roles_from_local) == len(tiered_all_entra_roles_from_local)) else True
         tiered_all_entra_roles_from_local = sorted(updated_tiered_all_entra_roles_from_local, key=lambda x: (x['tier'], x['assetName']))
         update_tiered_assets(entra_roles_tier_file, tiered_all_entra_roles_from_local)
-
+<
         if has_aat_been_updated:
             if len(updated_tiered_all_entra_roles_from_local) < len(tiered_all_entra_roles_from_local):
                 print ('Built-in Entra roles: no change detected in public AzTier, but upstream roles are not used locally anymore and have been removed from tiered assets')
