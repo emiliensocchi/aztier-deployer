@@ -860,15 +860,17 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
             if is_pim_enabled:
                 # Get active + eligible roles
                 azure_scope_resource_ids = get_resource_id_of_all_scopes_from_arm(token)
-                active_azure_role_ids = get_role_definition_id_of_active_azure_roles_within_scope_from_arm(token, azure_scope_resource_ids)
-                eligible_azure_role_ids = get_role_definition_id_of_eligible_azure_roles_within_scope_from_arm(token, azure_scope_resource_ids)
-                all_azure_role_ids_in_use = active_azure_role_ids + eligible_azure_role_ids
-                built_in_azure_role_definitions_in_use = get_built_in_azure_role_definitions_from_arm(token, all_azure_role_ids_in_use)
+                active_azure_role_definition_ids = get_role_definition_id_of_active_azure_roles_within_scope_from_arm(token, azure_scope_resource_ids)
+                eligible_azure_role_definition_ids = get_role_definition_id_of_eligible_azure_roles_within_scope_from_arm(token, azure_scope_resource_ids)
+                all_azure_role_definition_ids_in_use = active_azure_role_definition_ids + eligible_azure_role_definition_ids
+                all_azure_role_ids_in_use = [role_definition_id.split("/")[-1] for role_definition_id in all_azure_role_definition_ids_in_use]
+                built_in_azure_role_definitions_in_use = get_built_in_azure_role_definitions_from_arm(token, all_azure_role_definition_ids_in_use)
             else:
                 # Get permanently assigned roles
                 azure_scope_resource_ids = get_resource_id_of_all_scopes_from_arm(token)
-                assigned_azure_role_ids = get_role_definition_id_of_assigned_azure_roles_within_scope_from_arm(token, azure_scope_resource_ids)
-                built_in_azure_role_definitions_in_use = get_built_in_azure_role_definitions_from_arm(token, assigned_azure_role_ids)
+                all_azure_role_definition_ids_in_use = get_role_definition_id_of_assigned_azure_roles_within_scope_from_arm(token, azure_scope_resource_ids)
+                all_azure_role_ids_in_use = [role_definition_id.split("/")[-1] for role_definition_id in all_azure_role_definition_ids_in_use]
+                built_in_azure_role_definitions_in_use = get_built_in_azure_role_definitions_from_arm(token, all_azure_role_definition_ids_in_use)
 
             # Filter out only the roles that are in use
             added_tiered_azure_roles = [role for role in added_tiered_azure_roles if role['id'] in [r['roleId'] for r in built_in_azure_role_definitions_in_use]]
@@ -905,6 +907,7 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
             # Check if tiered roles are still in use
             tiered_all_roles_from_local = [role for role in tiered_all_roles_from_local if (role['id'] in all_azure_role_ids_in_use or role['assetType'] == 'Custom')]
 
+
     elif role_type == 'entra':
         # Added Entra roles
         added_tiered_entra_roles = find_added_assets(tiered_builtin_roles_from_aat, tiered_builtin_roles_from_local)
@@ -916,14 +919,16 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
 
             if is_pim_enabled:
                 # Get active + eligible roles
-                active_entra_role_ids = get_role_definition_id_of_active_entra_roles_from_graph(token)
-                eligible_entra_role_ids = get_role_definition_id_of_eligible_entra_roles_from_graph(token)
-                all_entra_role_ids_in_use = active_entra_role_ids + eligible_entra_role_ids
-                built_in_entra_role_definitions_in_use = [role for role in added_tiered_entra_roles if role['id'] in all_entra_role_ids_in_use]
+                active_entra_role_definition_ids = get_role_definition_id_of_active_entra_roles_from_graph(token)
+                eligible_entra_role_definition_ids = get_role_definition_id_of_eligible_entra_roles_from_graph(token)
+                all_entra_role_definition_ids_in_use = active_entra_role_definition_ids + eligible_entra_role_definition_ids
+                all_entra_role_ids_in_use = [role_definition_id.split("/")[-1] for role_definition_id in all_entra_role_definition_ids_in_use]
+                built_in_entra_role_definitions_in_use = [role for role in added_tiered_entra_roles if role['id'] in all_entra_role_definition_ids_in_use]
             else:
                 # Get active roles (= permanently assigned)
-                active_entra_role_ids = get_role_definition_id_of_active_entra_roles_from_graph(token)
-                built_in_entra_role_definitions_in_use = [role for role in added_tiered_entra_roles if role['id'] in active_entra_role_ids]
+                all_entra_role_definition_ids_in_use = get_role_definition_id_of_active_entra_roles_from_graph(token)
+                all_entra_role_ids_in_use = [role_definition_id.split("/")[-1] for role_definition_id in all_entra_role_definition_ids_in_use]
+                built_in_entra_role_definitions_in_use = [role for role in added_tiered_entra_roles if role['id'] in all_entra_role_definition_ids_in_use]
 
             # Filter out only the roles that are in use
             added_tiered_entra_roles = [role for role in added_tiered_entra_roles if role['id'] in [r['id'] for r in built_in_entra_role_definitions_in_use]]
