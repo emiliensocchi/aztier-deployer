@@ -6,10 +6,10 @@ This page summarizes the different options available to **configure** AzTier.
 ## 🖥️ Frontend configuration breakdown
 
 > [!NOTE]  
-> All frontend configuration is centralized in [./app/frontend/config.json](https://github.com/emiliensocchi/aztier-deployer/blob/main/app/frontend/config.json).
+> All frontend configuration is centralized in [./app/frontend/config.json](https://github.com/storebrand-technology/azure-internal-tiering/blob/main/app/frontend/config.json).
 
 > [!IMPORTANT]  
-> `company_name` is the only option necessary to configure for most users. The rest should be modified only if the configuration and data files are consumed differently than via the provided Flask backend (see [architecture](https://github.com/emiliensocchi/aztier-deployer/wiki/architecture) for more info).
+> `company_name` is the only option necessary to configure for most users. The rest should be modified only if the configuration and data files are consumed differently than via the provided Flask backend (see [architecture](https://github.com/storebrand-technology/azure-internal-tiering/wiki/architecture) for more info).
 
 The frontend supports the following configuration options:
 
@@ -25,11 +25,12 @@ The frontend supports the following configuration options:
 ## 🔧 Backend configuration breakdown
 
 > [!NOTE]
-> All backend configuration is centralized in [./config.json](https://github.com/emiliensocchi/aztier-deployer/blob/main/config.json).
+> All backend configuration is centralized in [./config.json](https://github.com/storebrand-technology/azure-internal-tiering/blob/main/config.json).
 
 The backend supports the following configuration options:
 
 | Configuration name | Possible value(s) | Description | 
 |---|---|---|
-| `keepLocalChanges` | `true`/`false` |  Whether changes made to built-in assets inherited from [public AzTier](https://github.com/emiliensocchi/azure-tiering) should be kept during the next synchronization, or overwritten with upstream data. This allows to categorize built-in assets differently than upstream. <br>Default value: `false`.
-| `includeOnlyRolesInUse` | `true`/`false` | Whether all roles from [public AzTier](https://github.com/emiliensocchi/azure-tiering) should be included during synchronization, or only those that are currently in use in the tenant (i.e. eligibly, actively or permanently assigned). <br>Default value: `true`.
+| `keepLocalChanges` | `true`/`false` |  Whether changes made to built-in assets inherited from [public AzTier](https://github.com/emiliensocchi/azure-tiering) should be kept during the next synchronization, or overwritten with upstream data. This allows to categorize built-in assets differently than upstream. <br>Default value: `false`. |
+| `includeOnlyRolesInUse` | `true`/`false` | Whether all roles from [public AzTier](https://github.com/emiliensocchi/azure-tiering) should be included during synchronization, or only those that are currently in use in the tenant (i.e. eligibly, actively or permanently assigned). <br>Default value: `true`. | 
+| `includeIndividualResourceScope` | `true`/`false` | Whether Azure roles assigned on individual resources should be scraped to detect untiered roles. <br>**Warning**: this is extremely slow in large tenants using PIM, as scraping eligible and active roles assignments for each Azure resource requires sending an extremely high amount of requests. **This configuration should only be set to `true` in tenants without PIM, or with less than 5000 individual resources deployed**. <br>Default value: `false`. | 

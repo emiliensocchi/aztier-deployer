@@ -1,4 +1,5 @@
 {
     "keepLocalChanges": "false",
-    "includeOnlyRolesInUse": "true"
+    "includeOnlyRolesInUse": "true",
+    "includeIndividualResourceScope": "false" 
 }
