@@ -41,17 +41,49 @@ import uuid
 
 # ARM functions ###################################################################################################################################################
 
-def is_pim_enabled_for_arm(token):
+def get_arm_access_token():
+    """
+        Acquires an ARM access token using the GitHub-issued OIDC token.
+        
+        Returns:
+            str: The acquired ARM access token.
+
+    """
+    azure_tenant_id = os.environ["AZURE_TENANT_ID"]
+    azure_client_id = os.environ["AZURE_CLIENT_ID"]
+    github_action_token = os.environ.get('ACTIONS_ID_TOKEN_REQUEST_TOKEN')
+    github_action_uri = os.environ.get('ACTIONS_ID_TOKEN_REQUEST_URL')
+
+    # Get Github OIDC token
+    endpoint = f"{github_action_uri}&audience=api://AzureADTokenExchange"
+    headers = {'Authorization': f"Bearer {github_action_token}"}
+    oidc_response = requests.get(endpoint, headers = headers)
+    github_oidc_token = oidc_response.json()["value"]
+
+    # Get ARM token
+    endpoint = f"https://login.microsoftonline.com/{azure_tenant_id}/oauth2/v2.0/token"
+    body = {
+        "client_id": azure_client_id,
+        "scope": "https://management.azure.com/.default",
+        "grant_type": "client_credentials",
+        "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+        "client_assertion": github_oidc_token
+    }
+    response = requests.post(endpoint, data = body)
+    access_token = response.json().get("access_token")
+
+    return access_token
+
+
+def is_pim_enabled_for_arm():
     """
         Checks if the passed token has access to the PIM endpoints.
-
-        Args:
-            token(str): a valid access token for ARM
 
         Returns:
             bool: True if PIM is enabled, False otherwise
 
     """
+    token = get_arm_access_token()
     endpoint = 'https://management.azure.com/providers/Microsoft.Authorization/roleEligibilityScheduleInstances?$filter=asTarget()&api-version=2020-10-01'
     headers = {'Authorization': f"Bearer {token}"}
     response = requests.get(endpoint, headers = headers)
@@ -62,121 +94,226 @@ def is_pim_enabled_for_arm(token):
     return False
 
 
-def send_batch_request_to_arm(token, batch_requests):
+def send_batch_request_to_arm(batch_requests):
     """
-        Sends the passed batch requests to ARM, while handling pagination and throttling to return a complete response.
+        Sends the passed batch requests to ARM, while handling pagination, throttling and other errors to return a complete response.
 
         More info:
-            https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/request-limits-and-throttling#migrating-to-regional-throttling-and-token-bucket-algorithm
+            https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/request-limits-and-throttling
         
         Args:
-            token(str): a valid access token for ARM
             batch_requests(list(dict)): list of batch requests to send to ARM
 
         Returns:
             list(dict): list of responses from ARM
     
     """
+    def send_http_get_request(request, headers):
+        """
+            Sends an HTTP request and handles request exceptions.
+
+            Args:
+                request(str): the HTTP request to send
+                headers(dict): the headers to include in the HTTP request
+            
+            Returns:
+                requests.models.Response: the returned HTTP response
+
+        """
+        try:
+            response = requests.get(request, headers = headers)
+            return response
+        
+        except requests.exceptions.RequestException as e:
+            default_wait_time = 60
+            print(f"FATAL ERROR - An error occurred while checking the status of the asynchronous response: {e}")
+            print (f"Sleep for {default_wait_time} seconds before retrying")
+            time.sleep(default_wait_time)
+            response = send_http_get_request(request, headers)
+            return response
+
+
+    def handle_asynchronous_http_responses(http_response):
+        """
+            Handles asynchronous HTTP responses from ARM, including pagination.
+
+            Args:
+                http_response(requests.models.Response): the HTTP response from ARM
+
+            Returns:
+                list(dict): list of responses from ARM
+
+        """
+        all_responses = []
+
+        if http_response.status_code == 202:
+            # Responses are processed asynchronously and served paginated
+            retry_after_x_seconds = int(http_response.headers.get('Retry-After'))
+            page_response = http_response
+
+            while page_response.status_code == 202:
+                # Check status periodically until the response is ready
+                time.sleep(retry_after_x_seconds) 
+                page = http_response.headers.get('Location')
+                page_response = send_http_get_request(page, headers = headers)
+
+            if page_response.status_code != 200:
+                # The asynchronous response has failed and there is a problem with the API
+                print ("FATAL ERROR - The asynchronous response from ARM has failed. There is an unknown issue with the API.")
+                return None
+
+            # The response is ready
+            paginated_response = page_response.json()['value']
+            all_responses += paginated_response
+            next_page = page_response.json()['nextLink'] if 'nextLink' in page_response.json() else ''
+
+            while next_page:
+                # There are more pages to retrieve                    
+                next_page_response = send_http_get_request(next_page, headers = headers)
+
+                while next_page_response.status_code == 202:
+                    # The next page is not ready yet, wait and retry
+                    time.sleep(retry_after_x_seconds)
+
+                # The next page is ready
+                all_responses += next_page_response.json()['value']
+                next_page = next_page_response.json()['nextLink'] if 'nextLink' in next_page_response.json() else ''
+
+        elif http_response.status_code == 200:
+            # The response is synchronous and ready
+            if 'responses' in http_response.json():
+                # The response is a multi-paginated response
+                return http_response.json()['responses']
+            
+            elif 'value' in http_response.json():
+                # The response is a single-paginated response
+                return http_response.json()['value']
+            
+            # The response is a single non-paginated response
+            return http_response.json()
+        
+        else:
+            # The response has failed and there is a problem with the API
+            print ("FATAL ERROR - The response from ARM is not valid. There is an unknown issue with the API.")
+            return None
+
+        return all_responses
+
+    # Main function logic
     complete_response = []
 
     # Divide the passed batch into smaller chunks to stay within API limits
-    batch_request_size_limit = 500  
-    limited_batch_requests = [batch_requests[i:i + batch_request_size_limit] for i in range(0, len(batch_requests), batch_request_size_limit)]
+    batch_request_size_limit = 500
+    chunked_batch_requests = [batch_requests[i:i + batch_request_size_limit] for i in range(0, len(batch_requests), batch_request_size_limit)]
     
-    for limited_batch_request in limited_batch_requests:
-        remaining_requests = limited_batch_request
+    for chunked_batch_request in chunked_batch_requests:
+        # Get a new ARM token for each chunk
+        token = get_arm_access_token()
+        remaining_requests = chunked_batch_request
         
         # Loop until no request is throttled
         while remaining_requests:
-            # Create the batch request
+            # Create and send the batch request
             endpoint = 'https://management.azure.com/batch?api-version=2021-04-01'
             headers = {'Authorization': f"Bearer {token}"}
             body = { 
                 'requests': remaining_requests
             }
-
             http_response = requests.post(endpoint, headers = headers, json = body)
+            asynchronous_responses = handle_asynchronous_http_responses(http_response)
 
-            if http_response.status_code != 200 and http_response.status_code != 202:
-                return None
+            # Analyze HTTP responses #######################################################################################################
 
-            # Check if the response is paginated
-            all_responses = []
-            redirect_header = 'Location'
-            retry_header = 'Retry-After'
-
-            if redirect_header in http_response.headers:
-                # The response is paginated - wait for all individual requests in the batch to finish
-                #retry_after_x_seconds = int(http_response.headers.get(retry_header))
-                #time.sleep(retry_after_x_seconds)
-                time.sleep(5)   # Seems acceptable and faster than the Retry-After header typically set to 20 seconds
-                page = http_response.headers.get(redirect_header)
-                http_response = requests.get(page, headers = headers)
-                
-                if http_response.status_code != 200 and http_response.status_code != 202:
-                    return None
-
-                paginated_response = http_response.json()['value']
-                all_responses = paginated_response
-                next_page = http_response.json()['nextLink'] if 'nextLink' in http_response.json() else ''
-
-                # Get paginated reponse until no more pages
-                while next_page:
-                    http_response = requests.get(next_page, headers = headers)
-
-                    if http_response.status_code != 200 and http_response.status_code != 202:
-                        return None
-
-                    paginated_response = http_response.json()['value']
-                    next_page = http_response.json()['nextLink'] if 'nextLink' in http_response.json() else ''
-                    all_responses += paginated_response
-            else:
-                # The response is not paginated
-                all_responses = http_response.json()['responses']
-
-            # Identify throttled requests
-            successful_responses = [response for response in all_responses if response['httpStatusCode'] == 200 or response['httpStatusCode'] == 202]
+            # 200 - Identify successful requests
+            successful_responses = [response for response in asynchronous_responses if response['httpStatusCode'] == 200]
             complete_response += successful_responses
-            throttled_responses = [response for response in all_responses if response['httpStatusCode'] == 429]
 
-            if not throttled_responses:
-                break
+            # 429 - Identify throttled requests
+            throttled_responses = [response for response in asynchronous_responses if response['httpStatusCode'] == 429]
 
-            # Collect throttled requests
+            # 404 - Identify requests for resources that existed when retrieving scopes, but have been removed since then
+            responses_for_removed_scopes = [response for response in asynchronous_responses if response['httpStatusCode'] == 404]
+
+            # 500 - Identify requests that have failed due to server errors
+            server_error_responses = [response for response in asynchronous_responses if response['httpStatusCode'] == 500]
+
+            # 503 - Identify requests that have failed due to service unavailability
+            service_unavailable_responses = [response for response in asynchronous_responses if response['httpStatusCode'] == 503]
+
+            # Any - Identify other failed requests
+            other_responses = [response for response in asynchronous_responses if response['httpStatusCode'] != 200 and response['httpStatusCode'] != 429 and response['httpStatusCode'] != 404 and response['httpStatusCode'] != 500 and response['httpStatusCode'] != 503]
+            
+            # Handle unsuccessful requests #################################################################################################
             remaining_requests = []
-            for throttled_response in throttled_responses:
-                throttled_response_name = throttled_response['name']
-                throttled_request = next((r for r in limited_batch_request if r['name'] == throttled_response_name), None)
-                remaining_requests.append(throttled_request)
 
-            # Verify if a Rety-After header has been served and sleep for the specified time
-            last_throttled_response = throttled_responses[-1]
-            last_throttled_headers = last_throttled_response['headers']
+            # Any - Handle failed requests with unhandled HTTP status codes
+            if other_responses:
+                print("Responses received from ARM with unhandled HTTP status codes:")
+                c = 0 
+                for response in other_responses:
+                    print(f"Response {c + 1}:")
+                    print(f"Name: {response.get('status', '')}")
+                    print(f"Headers: {response.get('headers', {})}")
+                    print(f"Body (text): {response.get('content', '')}")
+                    c += 1
+                print()
 
-            if 'Retry-After' in last_throttled_headers:
-                wait_seconds = int(last_throttled_response['headers']['Retry-After'])
-                print(f"Throttled request - Sleep for: {wait_seconds} seconds")
-                time.sleep(wait_seconds)
-            else:
-                print(f"Throttled request - No 'Retry-After' header provided")
+            # 500 - Handle requests that have failed due to server errors
+            if server_error_responses:
+                default_wait_time = 60
+                print (f"Server error - Sleep for {default_wait_time} seconds before retrying")
+                time.sleep(default_wait_time)
+
+            # 503 - Handle requests that have failed due to service unavailability
+            if service_unavailable_responses:
+                default_wait_time = 60
+                print (f"Service unavailable - Sleep for {default_wait_time} seconds before retrying")
+                time.sleep(default_wait_time)
+
+            # Collect failed requests for retry
+            failed_responses = server_error_responses + service_unavailable_responses
+            for failed_response in failed_responses:
+                failed_response_name = failed_response['name']
+                failed_request = next((r for r in chunked_batch_request if r['name'] == failed_response_name), None)
+                remaining_requests.append(failed_request)
+
+            # 429 - Handle throttled requests
+            if throttled_responses:
+                # Collect throttled requests for retry
+                for throttled_response in throttled_responses:
+                    throttled_response_name = throttled_response['name']
+                    throttled_request = next((r for r in chunked_batch_request if r['name'] == throttled_response_name), None)
+                    remaining_requests.append(throttled_request)
+                    
+                # Calculate average 'Retry-After' header value across all throttled responses
+                default_wait_time = 20
+                retry_after_headers = [r['headers']['Retry-After'] for r in throttled_responses if ('headers' in r and 'Retry-After' in r['headers'])]
+                total_retry_after = sum(int(h) for h in retry_after_headers) if retry_after_headers else 0
+                avg_retry_after = (total_retry_after / len(retry_after_headers)) if total_retry_after else default_wait_time
+
+                # Sleep for the average 'Retry-After' duration before retrying
+                print(f"Throttled request - Sleep for: {avg_retry_after} seconds")
+                time.sleep(avg_retry_after)
+        
+        #print (f"DEBUG - End of While: {len(complete_response)}")
         # End of While
+
+    #print (f"DEBUG - Number of batch requests: {len(batch_requests)}")
+    #print (f"DEBUG - Number of batch responses: {len(complete_response)}")
 
     return complete_response
 
 
-def get_resource_id_of_all_scopes_from_arm(token):
+def get_resource_id_of_all_scopes_from_arm():
     """
-        Retrieves the resource Id of all scopes that the passed token has access to:
+        Retrieves the resource Id of all scopes in the tenant:
             - Management Groups
             - Subscriptions
             - Resource groups
             - Individual resources
 
-        Args:
-            token(str): a valid access token for ARM
-
         Returns:
-            list(str): list of resource Ids for all scopes that the token has access to
+            list(str): list of resource Ids for all scopes in the tenant
 
     """
     all_scopes = []
@@ -193,7 +330,7 @@ def get_resource_id_of_all_scopes_from_arm(token):
         }
     ]
 
-    http_responses = send_batch_request_to_arm(token, batch_requests)
+    http_responses = send_batch_request_to_arm(batch_requests)
 
     if http_responses is None:
         print('FATAL ERROR - The Azure scopes could not be retrieved from ARM.')
@@ -214,7 +351,7 @@ def get_resource_id_of_all_scopes_from_arm(token):
             "url": f"https://management.azure.com{subscription_resource_id}/resourceGroups?api-version=2021-04-01"
         })
 
-    http_responses = send_batch_request_to_arm(token, batch_requests)
+    http_responses = send_batch_request_to_arm(batch_requests)
     
     if http_responses is None:
         print('FATAL ERROR - The Azure scopes could not be retrieved from ARM.')
@@ -233,7 +370,7 @@ def get_resource_id_of_all_scopes_from_arm(token):
             "url": f"https://management.azure.com{rg_resource_id}/resources?api-version=2021-04-01"
         })
 
-    http_responses = send_batch_request_to_arm(token, batch_requests)
+    http_responses = send_batch_request_to_arm(batch_requests)
 
     if http_responses is None:
         print('FATAL ERROR - The Azure scopes could not be retrieved from ARM.')
@@ -247,15 +384,74 @@ def get_resource_id_of_all_scopes_from_arm(token):
     return all_scopes
 
 
-def get_role_definition_id_of_assigned_azure_roles_within_scope_from_arm(token, scope):
+def get_resource_id_of_higher_scopes_from_arm():
+    """
+        Retrieves the resource Id of higher scopes in the tenant:
+            - Management Groups
+            - Subscriptions
+            - Resource groups
+
+        Returns:
+            list(str): list of resource Ids for higher scopes in the tenant
+
+    """
+    higher_scopes = []
+
+    # Get Management groups and Subscriptions
+    batch_requests = [
+        {
+            "httpMethod": "GET",
+            "url": "https://management.azure.com/providers/Microsoft.Management/managementGroups?api-version=2021-04-01"
+        },
+        {
+            "httpMethod": "GET",
+            "url": "https://management.azure.com/subscriptions?api-version=2021-04-01"
+        }
+    ]
+
+    http_responses = send_batch_request_to_arm(batch_requests)
+
+    if http_responses is None:
+        print('FATAL ERROR - The Azure scopes could not be retrieved from ARM.')
+        exit()
+
+    mg_responses = http_responses[0]['content']['value']
+    mg_resource_ids = [response['id'] for response in mg_responses]
+    subscription_responses = http_responses[1]['content']['value']
+    subscription_resource_ids = [response['id'] for response in subscription_responses]
+
+    # Get Resource groups
+    batch_requests = []
+
+    for subscription_resource_id in subscription_resource_ids:
+        batch_requests.append({
+            "name": str(uuid.uuid4()),
+            "httpMethod": "GET",
+            "url": f"https://management.azure.com{subscription_resource_id}/resourceGroups?api-version=2021-04-01"
+        })
+
+    http_responses = send_batch_request_to_arm(batch_requests)
+    
+    if http_responses is None:
+        print('FATAL ERROR - The Azure scopes could not be retrieved from ARM.')
+        exit()
+
+    rg_responses = sum([response['content']['value'] for response in http_responses], [])
+    rg_resource_ids = [response['id'] for response in rg_responses]
+
+    # Merge higher scopes
+    higher_scopes = mg_resource_ids + subscription_resource_ids + rg_resource_ids
+    return higher_scopes
+
+
+def get_role_definition_id_of_assigned_azure_roles_within_scope_from_arm(scope):
     """
         Retrieves the definition Id of all assigned Azure roles within the passed scope.
-        
+
         Note:
             Uses the traditional role-assignment endpoint for tenants without PIM 
          
         Args:
-            token(str): a valid access token for ARM
             scope(list(str)): list of resource Ids to check for existing role assignments
 
         Returns:
@@ -271,7 +467,7 @@ def get_role_definition_id_of_assigned_azure_roles_within_scope_from_arm(token, 
             "url": f"https://management.azure.com{resource_id}/providers/Microsoft.Authorization/roleAssignments?api-version=2022-04-01&$filter=atScope()"
         })
 
-    http_responses = send_batch_request_to_arm(token, batch_requests)
+    http_responses = send_batch_request_to_arm(batch_requests)
 
     if http_responses is None:
         print('FATAL ERROR - The assigned Azure role definition Ids could not be retrieved from ARM.')
@@ -285,7 +481,7 @@ def get_role_definition_id_of_assigned_azure_roles_within_scope_from_arm(token, 
     return unique_role_definition_ids
 
 
-def get_role_definition_id_of_active_azure_roles_within_scope_from_arm(token, scope):
+def get_role_definition_id_of_active_azure_roles_within_scope_from_arm(scope):
     """
         Retrieves the definition Id of all active Azure roles within the passed scope.
         
@@ -293,7 +489,6 @@ def get_role_definition_id_of_active_azure_roles_within_scope_from_arm(token, sc
             Uses PIM endpoints, which requires an Entra Premium 2 license 
          
         Args:
-            token(str): a valid access token for ARM
             scope(list(str)): list of resource Ids to check for existing role assignments
 
         Returns:
@@ -309,7 +504,7 @@ def get_role_definition_id_of_active_azure_roles_within_scope_from_arm(token, sc
             "url": f"https://management.azure.com{resource_id}/providers/Microsoft.Authorization/roleAssignmentScheduleInstances?api-version=2020-10-01&$filter=atScope()"
         })
 
-    http_responses = send_batch_request_to_arm(token, batch_requests)
+    http_responses = send_batch_request_to_arm(batch_requests)
 
     if http_responses is None:
         print('FATAL ERROR - The active Azure role definition Ids could not be retrieved from ARM.')
@@ -323,7 +518,7 @@ def get_role_definition_id_of_active_azure_roles_within_scope_from_arm(token, sc
     return unique_role_definition_ids
 
 
-def get_role_definition_id_of_eligible_azure_roles_within_scope_from_arm(token, scope):
+def get_role_definition_id_of_eligible_azure_roles_within_scope_from_arm(scope):
     """
         Retrieves the definition Id of all eligible Azure roles within the passed scope.
 
@@ -331,7 +526,6 @@ def get_role_definition_id_of_eligible_azure_roles_within_scope_from_arm(token, 
             Uses PIM endpoints, which requires an Entra Premium 2 license 
 
         Args:
-            token(str): a valid access token for ARM
             scope(list(str)): list of resource Ids to check for existing role assignments
 
         Returns:
@@ -347,7 +541,7 @@ def get_role_definition_id_of_eligible_azure_roles_within_scope_from_arm(token, 
             "url": f"https://management.azure.com{resource_id}/providers/Microsoft.Authorization/roleEligibilityScheduleInstances?api-version=2020-10-01&$filter=atScope()"
         })
 
-    http_responses = send_batch_request_to_arm(token, batch_requests)
+    http_responses = send_batch_request_to_arm(batch_requests)
 
     if http_responses is None:
         print('FATAL ERROR - The eligible Azure role definition Ids could not be retrieved from ARM.')
@@ -361,12 +555,11 @@ def get_role_definition_id_of_eligible_azure_roles_within_scope_from_arm(token, 
     return unique_role_definition_ids
 
 
-def get_all_azure_role_definitions_from_arm(token, role_definition_ids):
+def get_all_azure_role_definitions_from_arm(role_definition_ids):
     """
         Retrieves the definition of all built-in and custom Azure roles with the passed definition Ids.
 
         Args:
-            token(str): a valid access token for ARM
             role_definition_ids(list): list of role definition Ids to check for existing role assignments
 
         Returns:
@@ -383,7 +576,7 @@ def get_all_azure_role_definitions_from_arm(token, role_definition_ids):
             "url": f"https://management.azure.com{role_definition_id}?api-version=2022-04-01"
         })
 
-    http_responses = send_batch_request_to_arm(token, batch_requests)
+    http_responses = send_batch_request_to_arm(batch_requests)
 
     if http_responses is None:
         print('FATAL ERROR - The Azure role definitions could not be retrieved from ARM.')
@@ -403,13 +596,12 @@ def get_all_azure_role_definitions_from_arm(token, role_definition_ids):
     return all_role_definitions
 
 
-def get_built_in_azure_role_definitions_from_arm(token, role_definition_ids):
+def get_built_in_azure_role_definitions_from_arm(role_definition_ids):
     """
         Retrieves the definition of all built-in Azure roles with the passed definition Ids.
         Note: 
         
         Args:
-            token(str): a valid access token for ARM
             role_definition_ids(list): list of role definition Ids to check for existing role assignments
 
         Returns:
@@ -419,7 +611,7 @@ def get_built_in_azure_role_definitions_from_arm(token, role_definition_ids):
             list(str): list of custom role definitions
 
     """
-    all_role_definitions = get_all_azure_role_definitions_from_arm(token, role_definition_ids)
+    all_role_definitions = get_all_azure_role_definitions_from_arm(role_definition_ids)
     built_in_role_definitions = [definition for definition in all_role_definitions if definition['roleType'] == 'BuiltInRole']
 
     return built_in_role_definitions
@@ -428,17 +620,15 @@ def get_built_in_azure_role_definitions_from_arm(token, role_definition_ids):
 
 # Entra functions #################################################################################################################################################
 
-def is_pim_enabled_for_graph(token):
+def is_pim_enabled_for_graph():
     """
         Checks if the passed MS Graph token has access to the PIM endpoints.
-
-        Args:
-            token(str): a valid access token for MS Graph
 
         Returns:
             bool: True if PIM is enabled, False otherwise
 
     """
+    token = get_msgraph_access_token()
     endpoint = 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleEligibilityScheduleInstances'
     headers = {'Authorization': f"Bearer {token}"}
     response = requests.get(endpoint, headers=headers)
@@ -449,19 +639,17 @@ def is_pim_enabled_for_graph(token):
     return False
 
 
-def get_role_definition_id_of_active_entra_roles_from_graph(token):
+def get_role_definition_id_of_active_entra_roles_from_graph():
     """
         Retrieves the Id of all Entra role definitions that are actively assigned in the tenant.
 
         Note:
             Does NOT use PIM endpoints (i.e. an Entra Premium 2 license is NOT required to call this function)
 
-        Args:
-            token(str): a valid access token for MS Graph
-
         Returns:
             list(str): list of role definition Ids
     """
+    token = get_msgraph_access_token()
     endpoint = "https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments"
     headers = {"Authorization": f"Bearer {token}"}
     role_definition_ids = []
@@ -489,19 +677,17 @@ def get_role_definition_id_of_active_entra_roles_from_graph(token):
     return list(set(role_definition_ids))
 
 
-def get_role_definition_id_of_eligible_entra_roles_from_graph(token):
+def get_role_definition_id_of_eligible_entra_roles_from_graph():
     """
         Retrieves the Id of all Entra role definitions that are eligibly assigned in the tenant (PIM eligible).
 
         Note:
             Uses PIM endpoints, which requires an Entra Premium 2 license 
 
-        Args:
-            token(str): a valid access token for MS Graph
-
         Returns:
             list(str): list of role definition Ids
     """
+    token = get_msgraph_access_token()
     endpoint = "https://graph.microsoft.com/v1.0/roleManagement/directory/roleEligibilityScheduleInstances"
     headers = {"Authorization": f"Bearer {token}"}
     role_definition_ids = []
@@ -532,16 +718,48 @@ def get_role_definition_id_of_eligible_entra_roles_from_graph(token):
 
 # MS Graph functions ##############################################################################################################################################
 
-def get_assigned_msgraph_app_permission_ids(token):
+def get_msgraph_access_token():
+    """
+        Acquires an MS Graph access token using the GitHub-issued OIDC token.
+        
+        Returns:
+            str: The acquired MS Graph access token.
+
+    """
+    azure_tenant_id = os.environ["AZURE_TENANT_ID"]
+    azure_client_id = os.environ["AZURE_CLIENT_ID"]
+    github_action_token = os.environ.get('ACTIONS_ID_TOKEN_REQUEST_TOKEN')
+    github_action_uri = os.environ.get('ACTIONS_ID_TOKEN_REQUEST_URL')
+
+    # Get Github OIDC token
+    endpoint = f"{github_action_uri}&audience=api://AzureADTokenExchange"
+    headers = {'Authorization': f"Bearer {github_action_token}"}
+    oidc_response = requests.get(endpoint, headers = headers)
+    github_oidc_token = oidc_response.json()["value"]
+
+    # Get MS Graph token
+    endpoint = f"https://login.microsoftonline.com/{azure_tenant_id}/oauth2/v2.0/token"
+    body = {
+        "client_id": azure_client_id,
+        "scope": "https://graph.microsoft.com/.default",
+        "grant_type": "client_credentials",
+        "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+        "client_assertion": github_oidc_token
+    }
+    response = requests.post(endpoint, data = body)
+    access_token = response.json().get("access_token")
+
+    return access_token
+
+
+def get_assigned_msgraph_app_permission_ids():
     """
         Retrieves all MS Graph application permission IDs (roleDefinitionIds) assigned to principals in the tenant.
-
-        Args:
-            token(str): a valid access token for MS Graph
 
         Returns:
             list(str): list of MS Graph application permission IDs
     """
+    token = get_msgraph_access_token()
     endpoint = "https://graph.microsoft.com/v1.0/servicePrincipals?$select=id,appId,appRolesAssignedTo"
     headers = {"Authorization": f"Bearer {token}"}
     permission_ids = set()
@@ -828,14 +1046,14 @@ def enrich_asset_with_scope(asset, asset_scope):
     return dict(asset_values)
 
 
-def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role_type, tiered_builtin_roles_from_aat, tiered_all_roles_from_local):
+def run_sync_workflow(keep_local_changes, include_only_roles_in_use, include_individual_resource_scope, role_type, tiered_builtin_roles_from_aat, tiered_all_roles_from_local):
     """
         Synchronizes the passed roles from AAT with local roles. Local changes are either overriden or preserved based on the passed workflow type.
 
         Args:
-            token(str): a valid access token for ARM
             keep_local_changes(bool): the type of workflow to execute, deciding whether local changes should be preserved or overriden from the AAT
             include_only_roles_in_use(bool): whether to include only roles that are currently in use
+            include_individual_resource_scope(bool): whether to include individual resource scope in the synchronization
             role_type(str): the type of role to synchronize (accepted values: 'azure', 'entra', 'graph')
             tiered_builtin_roles_from_aat(list(dict)): list of built-in roles from the AAT
             tiered_all_roles_from_local(list(dict)): list of all roles currently tiered locally
@@ -855,22 +1073,22 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
         if include_only_roles_in_use:
             # Check if added roles are in use
             built_in_azure_role_definitions_in_use = []
-            is_pim_enabled = is_pim_enabled_for_arm(token)
+            is_pim_enabled = is_pim_enabled_for_arm()
 
             if is_pim_enabled:
                 # Get active + eligible roles
-                azure_scope_resource_ids = get_resource_id_of_all_scopes_from_arm(token)
-                active_azure_role_definition_ids = get_role_definition_id_of_active_azure_roles_within_scope_from_arm(token, azure_scope_resource_ids)
-                eligible_azure_role_definition_ids = get_role_definition_id_of_eligible_azure_roles_within_scope_from_arm(token, azure_scope_resource_ids)
+                azure_scope_resource_ids = get_resource_id_of_higher_scopes_from_arm() if not include_individual_resource_scope else get_resource_id_of_all_scopes_from_arm()
+                active_azure_role_definition_ids = get_role_definition_id_of_active_azure_roles_within_scope_from_arm(azure_scope_resource_ids)
+                eligible_azure_role_definition_ids = get_role_definition_id_of_eligible_azure_roles_within_scope_from_arm(azure_scope_resource_ids)
                 all_azure_role_definition_ids_in_use = active_azure_role_definition_ids + eligible_azure_role_definition_ids
                 all_azure_role_ids_in_use = [role_definition_id.split("/")[-1] for role_definition_id in all_azure_role_definition_ids_in_use]
-                built_in_azure_role_definitions_in_use = get_built_in_azure_role_definitions_from_arm(token, all_azure_role_definition_ids_in_use)
+                built_in_azure_role_definitions_in_use = get_built_in_azure_role_definitions_from_arm(all_azure_role_definition_ids_in_use)
             else:
                 # Get permanently assigned roles
-                azure_scope_resource_ids = get_resource_id_of_all_scopes_from_arm(token)
-                all_azure_role_definition_ids_in_use = get_role_definition_id_of_assigned_azure_roles_within_scope_from_arm(token, azure_scope_resource_ids)
+                azure_scope_resource_ids = get_resource_id_of_higher_scopes_from_arm() if not include_individual_resource_scope else get_resource_id_of_all_scopes_from_arm()
+                all_azure_role_definition_ids_in_use = get_role_definition_id_of_assigned_azure_roles_within_scope_from_arm(azure_scope_resource_ids)
                 all_azure_role_ids_in_use = [role_definition_id.split("/")[-1] for role_definition_id in all_azure_role_definition_ids_in_use]
-                built_in_azure_role_definitions_in_use = get_built_in_azure_role_definitions_from_arm(token, all_azure_role_definition_ids_in_use)
+                built_in_azure_role_definitions_in_use = get_built_in_azure_role_definitions_from_arm(all_azure_role_definition_ids_in_use)
 
             # Filter out only the roles that are in use
             added_tiered_azure_roles = [role for role in added_tiered_azure_roles if role['id'] in [r['roleId'] for r in built_in_azure_role_definitions_in_use]]
@@ -915,18 +1133,18 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
 
         if include_only_roles_in_use:
             # Check if added roles are in use
-            is_pim_enabled = is_pim_enabled_for_graph(token)
+            is_pim_enabled = is_pim_enabled_for_graph()
 
             if is_pim_enabled:
                 # Get active + eligible roles
-                active_entra_role_definition_ids = get_role_definition_id_of_active_entra_roles_from_graph(token)
-                eligible_entra_role_definition_ids = get_role_definition_id_of_eligible_entra_roles_from_graph(token)
+                active_entra_role_definition_ids = get_role_definition_id_of_active_entra_roles_from_graph()
+                eligible_entra_role_definition_ids = get_role_definition_id_of_eligible_entra_roles_from_graph()
                 all_entra_role_definition_ids_in_use = active_entra_role_definition_ids + eligible_entra_role_definition_ids
                 all_entra_role_ids_in_use = [role_definition_id.split("/")[-1] for role_definition_id in all_entra_role_definition_ids_in_use]
                 built_in_entra_role_definitions_in_use = [role for role in added_tiered_entra_roles if role['id'] in all_entra_role_definition_ids_in_use]
             else:
                 # Get active roles (= permanently assigned)
-                all_entra_role_definition_ids_in_use = get_role_definition_id_of_active_entra_roles_from_graph(token)
+                all_entra_role_definition_ids_in_use = get_role_definition_id_of_active_entra_roles_from_graph()
                 all_entra_role_ids_in_use = [role_definition_id.split("/")[-1] for role_definition_id in all_entra_role_definition_ids_in_use]
                 built_in_entra_role_definitions_in_use = [role for role in added_tiered_entra_roles if role['id'] in all_entra_role_definition_ids_in_use]
 
@@ -972,7 +1190,7 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
 
         if include_only_roles_in_use:
             # Check if added permissions are in use
-            all_assigned_msgraph_app_permission_ids = get_assigned_msgraph_app_permission_ids(token)
+            all_assigned_msgraph_app_permission_ids = get_assigned_msgraph_app_permission_ids()
             # Filter out only the permissions that are in use
             added_tiered_msgraph_permissions = [perm for perm in added_tiered_msgraph_permissions if perm['id'] in all_assigned_msgraph_app_permission_ids]
 
@@ -1016,19 +1234,7 @@ def run_sync_workflow(token, keep_local_changes, include_only_roles_in_use, role
 
 
 if __name__ == "__main__":
-    # Get ARM and MS Graph access tokens from environment variables
-    arm_access_token = os.environ['ARM_ACCESS_TOKEN']
-    graph_access_token = os.environ['MSGRAPH_ACCESS_TOKEN']
-
-    if not arm_access_token:
-        print('FATAL ERROR - A valid access token for ARM is required.')
-        exit()
-
-    if not graph_access_token:
-        print('FATAL ERROR - A valid access token for MS Graph is required.')
-        exit()
-
-    # Set local directory    
+    # Set local directory
     github_action_dir_name = '.github'
     absolute_path_to_script = os.path.abspath(sys.argv[0])
     root_dir = absolute_path_to_script.split(github_action_dir_name)[0]
@@ -1055,6 +1261,7 @@ if __name__ == "__main__":
 
     keep_local_changes_config = project_config['keepLocalChanges'].lower()
     include_only_roles_in_use_config = project_config['includeOnlyRolesInUse'].lower()
+    include_individual_resource_scope_config = project_config['includeIndividualResourceScope'].lower()
     accepted_values = [ 'false', 'true' ]
 
     if not keep_local_changes_config in accepted_values:
@@ -1065,14 +1272,22 @@ if __name__ == "__main__":
         print("FATAL ERROR - The 'includeOnlyRolesInUse' value set in the project's configuration file is invalid. Accepted values are: 'True', 'False'")
         exit()
 
+    if not include_individual_resource_scope_config in accepted_values:
+        print("FATAL ERROR - The 'includeIndividualResourceScope' value set in the project's configuration file is invalid. Accepted values are: 'True', 'False'")
+        exit()
+
     keep_local_changes = True if keep_local_changes_config == 'true' else False
     include_only_roles_in_use = True if include_only_roles_in_use_config == 'true' else False
+    include_individual_resource_scope = True if include_individual_resource_scope_config == 'true' else False
+
+
+    # AZURE ROLES ##################################################################################################################################################################
 
     # Update locally-tiered Azure roles with the latest upstream version
     tiered_all_azure_roles_from_local = read_tiered_json_file(azure_roles_tier_file)
     tiered_builtin_azure_roles_from_aat = get_tiered_builtin_azure_role_definitions_from_aat()
 
-    updated_tiered_all_azure_roles_from_local = run_sync_workflow(arm_access_token, keep_local_changes, include_only_roles_in_use, 'azure', tiered_builtin_azure_roles_from_aat, tiered_all_azure_roles_from_local[:])
+    updated_tiered_all_azure_roles_from_local = run_sync_workflow(keep_local_changes, include_only_roles_in_use, include_individual_resource_scope, 'azure', tiered_builtin_azure_roles_from_aat, tiered_all_azure_roles_from_local[:])
     has_aat_been_updated = False if (updated_tiered_all_azure_roles_from_local == tiered_all_azure_roles_from_local) else True
 
     if has_aat_been_updated:
@@ -1091,11 +1306,13 @@ if __name__ == "__main__":
         print ('Built-in Azure roles: no change')
 
 
+    # ENTRA ROLES ##################################################################################################################################################################
+
     # Update locally-tiered Entra roles with the latest upstream version
     tiered_all_entra_roles_from_local = read_tiered_json_file(entra_roles_tier_file)
     tiered_builtin_entra_roles_from_aat = get_tiered_builtin_entra_role_definitions_from_aat()
 
-    updated_tiered_all_entra_roles_from_local = run_sync_workflow(graph_access_token, keep_local_changes, include_only_roles_in_use, 'entra', tiered_builtin_entra_roles_from_aat, tiered_all_entra_roles_from_local[:])
+    updated_tiered_all_entra_roles_from_local = run_sync_workflow(keep_local_changes, include_only_roles_in_use, include_individual_resource_scope, 'entra', tiered_builtin_entra_roles_from_aat, tiered_all_entra_roles_from_local[:])
     has_aat_been_updated = False if (updated_tiered_all_entra_roles_from_local == tiered_all_entra_roles_from_local) else True
 
     if has_aat_been_updated:
@@ -1114,11 +1331,13 @@ if __name__ == "__main__":
         print ('Built-in Entra roles: no change')
 
 
+    # GRAPH PERMISSIONS ############################################################################################################################################################
+
     # Update locally-tiered MS Graph application permissions with the latest upstream version
     tiered_all_msgraph_app_permissions_from_local = read_tiered_json_file(msgraph_app_permissions_tier_file)
     tiered_builtin_msgraph_app_permissions_from_aat = get_tiered_builtin_msgraph_app_permission_definitions_from_aat()
 
-    updated_tiered_all_msgraph_app_permissions_from_local = run_sync_workflow(graph_access_token, keep_local_changes, include_only_roles_in_use, 'graph', tiered_builtin_msgraph_app_permissions_from_aat, tiered_all_msgraph_app_permissions_from_local[:])
+    updated_tiered_all_msgraph_app_permissions_from_local = run_sync_workflow(keep_local_changes, include_only_roles_in_use, include_individual_resource_scope, 'graph', tiered_builtin_msgraph_app_permissions_from_aat, tiered_all_msgraph_app_permissions_from_local[:])
     has_aat_been_updated = False if (updated_tiered_all_msgraph_app_permissions_from_local == tiered_all_msgraph_app_permissions_from_local) else True
 
     if has_aat_been_updated:
