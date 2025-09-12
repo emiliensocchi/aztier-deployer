@@ -17,6 +17,10 @@ spec:
             name: aztier-frontend
             port:
               number: 80
+  tls:
+  - hosts:
+    - aztier.mydomain.com   # Replace with your domain
+    secretName: aztier-tls-secret
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -37,3 +41,7 @@ spec:
             name: aztier-backend
             port:
               number: 5000
+  tls:
+  - hosts:
+    - aztier.mydomain.com   # Replace with your domain
+    secretName: aztier-tls-secret
