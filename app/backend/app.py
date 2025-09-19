@@ -42,6 +42,14 @@ def get_secret_from_key_vault(vault_url, secret_name):
 
 # Routing functions ##########################################################################
 
+@app.route('/healthz')
+def healthz():
+    """
+    Health check endpoint.
+    """
+    return 'ok', 200
+
+
 @app.route('/api/tier-definitions')
 def api_get_tier_definitions():
     """
